@@ -11,7 +11,7 @@
 **THIS APPLICATION DOES NOT DETECT OR MONITOR WHETHER YOUR KEY FOB IS STILL INSIDE THE VEHICLE.**
 
 - If Timed Auto-Lock is enabled, **it will lock all vehicle doors after the timer expires even if your key fob is still inside the car.**
-- **You are solely responsible for ensuring you do not lock yourself, passengers, pets, or your keys inside the vehicle.**
+- **You are solely responsible for ensuring you do not lock your key fob inside the vehicle.**
 - Always carry your key fob with you when exiting the vehicle, and **always keep an alternate method to unlock your car available** at all times:
   - Connected phone app (e.g., Hyundai Bluelink / Kia Connect)
   - Physical mechanical key blade
