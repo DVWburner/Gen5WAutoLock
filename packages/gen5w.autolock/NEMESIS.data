@@ -1,0 +1,24 @@
+[nemesis]
+version=1.1
+id=gen5w.autolock
+name=Timed Auto-Lock
+type=application,service
+package-version=1.0.0
+short-desc="Walk-away auto door lock after IGN OFF and last door closes."
+detailed-desc="Monitors IGN off, cabin door events, optionally waits for phone bluetooth disconnect, then locks all doors after a configurable timer. DOES NOT CHECK IF FOB IS STILL IN CAR. Tested on '22 Limited Ioniq 5."
+os=any
+models=any
+postinstall=scripts/post.sh
+
+[app.0]
+kind=apk
+path=app/Gen5WAutoLock.apk
+package=com.gen5w.autolock
+component=com.gen5w.autolock/.MainActivity
+
+[service.0]
+name=autolock-daemon
+kind=sh
+path=svc/daemon.sh
+uid=root
+mode=restart
