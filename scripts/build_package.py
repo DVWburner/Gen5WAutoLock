@@ -150,11 +150,19 @@ def main() -> None:
     zip_name = f"gen5w.autolock-{ver}.zip"
 
     inst = ROOT / "dist" / "autolock-installer"
-    build_zip(pkg_dir, inst / zip_name)
-    (inst / "NEMESIS.data").write_bytes(
+    pkg_zip = inst / zip_name
+    build_zip(pkg_dir, pkg_zip)
+    installer_data = inst / "NEMESIS.data"
+    installer_data.write_bytes(
         f"[nemesis]\nversion=1.0\ntype=install\npath={zip_name}\n".encode("utf-8")
     )
-    print(f"Wrote {inst / 'NEMESIS.data'}")
+    print(f"Wrote {installer_data}")
+
+    usb_zip = inst / f"gen5w.autolock-{ver}-USB.zip"
+    with zipfile.ZipFile(usb_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(installer_data, "NEMESIS.data")
+        zf.write(pkg_zip, zip_name)
+    print(f"Wrote {usb_zip} ({usb_zip.stat().st_size} bytes)")
 
 
 if __name__ == "__main__":

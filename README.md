@@ -71,8 +71,8 @@ IN NO EVENT SHALL THE AUTHOR(S) OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES
 Install `gen5w.autolock` (**Timed Auto-Lock**) via the [NEMESIS Package Store](https://xwtk.cloud/services/nemesis/).
 
 ### Option 2: USB Drive (`NEMESIS.data`)
-1. Download `gen5w.autolock-1.5.0.zip` and `NEMESIS.data` from the [**v1.5.0 Release**](../../releases/tag/v1.5.0) (or copy them from [`dist/autolock-installer/`](dist/autolock-installer/)).
-2. Place both `NEMESIS.data` and `gen5w.autolock-1.5.0.zip` at the root of a FAT32/exFAT USB drive.
+1. Download **`gen5w.autolock-1.5.0-USB.zip`** from the [**v1.5.0 Release**](../../releases/tag/v1.5.0) (contains both `NEMESIS.data` and `gen5w.autolock-1.5.0.zip`), or copy both files from [`dist/autolock-installer/`](dist/autolock-installer/).
+2. Extract both `NEMESIS.data` and `gen5w.autolock-1.5.0.zip` to the root of a FAT32/exFAT USB drive.
 3. Insert the USB drive into your NEMESIS-equipped Gen5W head unit to install.
 
 ---
