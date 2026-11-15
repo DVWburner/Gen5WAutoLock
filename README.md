@@ -1,4 +1,4 @@
-# Timed Auto-Lock (`gen5w.autolock`) — v1.0.0
+# Timed Auto-Lock (`gen5w.autolock`) — v1.5.0
 
 > **AI-Generated Project Notice:** This project (including its Android application, root daemon script, icons, and packaging tools) is **AI-generated**.
 
@@ -30,25 +30,38 @@ IN NO EVENT SHALL THE AUTHOR(S) OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES
 ## How It Works
 
 ```text
-[ Ignition Off ]  --->  [ Driver Exits Car ]  --->  [ Doors Lock 5–20s After Last Door Closes ]
+[ Ignition Off & Leave Car ] -> [ 5–20s After Last Door Closes (, ignoring hatchback) ] -> [ Phone Signal Drops (if detected) ] -> [ Lock Doors ]
 ```
 
-1. **Ignition Off (`IGN ON -> IGN OFF`):** The background daemon detects when the vehicle is parked and powered off.
-2. **Driver / Occupants Exit:** Waits for at least one of the 4 cabin doors to open and then for **all 4 cabin doors to close**. If any cabin door is re-opened while getting items out, the timer resets until the last cabin door closes.
-   - **Rear Hatch Excluded:** The rear hatch / power tailgate (`5th door`) and front hood are intentionally excluded from this timer so the cabin doors still lock normally while the tailgate is open or closing.
-3. **Configurable Countdown (`5–20s`):** Counts down your selected delay (`5` to `20` seconds; default `10s`).
-4. **Optional Phone Bluetooth Disconnect Gate:** If **"Require Bluetooth connection to phone to drop before locking"** is enabled, the daemon waits until your phone disconnects from the head unit's Bluetooth (`HFP` and `A2DP`) before locking.
-5. **Final Door Check & Lock:** Performs a final check that all 4 cabin doors remain closed, then issues the BCM door lock command (`IBCMService.lockDoor(true)`).
+1. **Ignition Off (`IGN ON -> IGN OFF`):** Detects when the vehicle is parked and turned off.
+2. **Driver & Passengers Exit:** Waits for a door to open and then for all doors to close.
+   - **Ignore Hatchback Being Open (Default ON):** When checked, the rear hatch / power tailgate is ignored by the timer. When unchecked, the timer waits for the rear hatch to close as well.
+3. **Configurable Delay (`5–20s`):** Counts down your chosen delay (`5` to `20` seconds, default `10s`) after the last door closes.
+4. **Automatic Phone Proximity Detection (No Toggle Required):**
+   - **Wi-Fi Direct (Wireless CarPlay / Android Auto — Priority):** If a phone is connected over Wi-Fi Direct (`wlan0`), the daemon holds off locking after the timer until your phone drops out of range (~15–20 ft outside the car).
+   - **Bluetooth (`HFP` / `A2DP` — Fallback):** If no Wi-Fi Direct phone is detected but a Bluetooth phone is connected, the daemon waits until Bluetooth disconnects.
+   - **Timer Only:** If no phone is detected, the doors lock automatically as soon as the countdown finishes.
+5. **Final Safety Check & Lock:** Verifies all monitored doors are still closed right before issuing `IBCMService.lockDoor(true)`.
 
 ---
 
-## Features
+## Interface & Controls
 
-- **5-Second Safety Acknowledgement on Launch:** Requires confirming that you understand the app does not check for key fobs inside the car before accessing settings.
-- **Master On / Off Toggle:** Enable or disable walk-away auto-locking at any time with instant `✓ Saved` confirmation.
-- **Adjustable Lock Delay (`5s – 20s`):** High-contrast touch slider and `-` / `+` stepper buttons.
-- **Optional Bluetooth Disconnect Requirement:** Wait for phone Bluetooth connection to drop before locking.
-- **Persistent Background Bridge (`AutoLockBridgeService` + `autolock-daemon`):** Continues monitoring door states and Bluetooth even after you tap **Exit** to close the app UI.
+- **5-Second Safety Notice on Launch:** Requires acknowledging the key fob lockout warning before accessing controls.
+- **Dynamic Logic Workflow Display:** Updates live on screen to reflect your delay setting, hatchback preference, and currently detected phone type (`Wi-Fi Direct`, `Bluetooth`, or `Timer only`).
+- **Phone Connection Status Box:** Live green/red indicator showing:
+  - `Wi-Fi Direct Phone Connected` *(Green)*
+  - `Bluetooth Phone Connected` *(Green)*
+  - `No Phone Detected, Timer only` *(Red)*
+- **Large Touch Delay Stepper (`-` / `+`):** Adjust lock delay from `5s` to `20s` with instant `✓ Saved` confirmation.
+- **Master On/Off & Background Service:** Continues monitoring doors, Wi-Fi Direct, and Bluetooth in the background after you tap **Exit**.
+
+---
+
+## Troubleshooting Log (Optional)
+
+- By default, no logs are written to USB drives.
+- To capture a troubleshooting log, create an empty file named **`autolock.log`** at the root of your USB drive before inserting it into the head unit; the daemon will append logs to that file only when it already exists.
 
 ---
 
@@ -58,8 +71,8 @@ IN NO EVENT SHALL THE AUTHOR(S) OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES
 Install `gen5w.autolock` (**Timed Auto-Lock**) via the [NEMESIS Package Store](https://xwtk.cloud/services/nemesis/).
 
 ### Option 2: USB Drive (`NEMESIS.data`)
-1. Download `gen5w.autolock-1.0.0.zip` and `NEMESIS.data` from the [**v1.0.0 Release**](../../releases/tag/v1.0.0) (or copy them from [`dist/autolock-installer/`](dist/autolock-installer/)).
-2. Place both `NEMESIS.data` and `gen5w.autolock-1.0.0.zip` at the root of a FAT32/exFAT USB drive.
+1. Download `gen5w.autolock-1.5.0.zip` and `NEMESIS.data` from the [**v1.5.0 Release**](../../releases/tag/v1.5.0) (or copy them from [`dist/autolock-installer/`](dist/autolock-installer/)).
+2. Place both `NEMESIS.data` and `gen5w.autolock-1.5.0.zip` at the root of a FAT32/exFAT USB drive.
 3. Insert the USB drive into your NEMESIS-equipped Gen5W head unit to install.
 
 ---
@@ -75,5 +88,5 @@ python scripts/build_package.py
 
 Outputs:
 - `packages/gen5w.autolock/app/Gen5WAutoLock.apk`
-- `dist/autolock-installer/gen5w.autolock-1.0.0.zip`
+- `dist/autolock-installer/gen5w.autolock-1.5.0.zip`
 - `dist/autolock-installer/NEMESIS.data`

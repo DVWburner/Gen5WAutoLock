@@ -96,11 +96,11 @@ public class AutoLockBridgeService extends Service {
                             int pasOpen = data.readInt();
                             int rlOpen = data.readInt();
                             int rrOpen = data.readInt();
-                            data.readInt(); // trunkOpen (hatch excluded)
+                            int trunkOpen = data.readInt();
                             data.readInt(); // hoodState
                             int anyCabinOpen = (drvOpen == 1 || pasOpen == 1 || rlOpen == 1 || rrOpen == 1) ? 1 : 0;
                             int allCabinClosed = (anyCabinOpen == 0) ? 1 : 0;
-                            writeString(FILE_DOOR, anyCabinOpen + " " + allCabinClosed + "\n");
+                            writeString(FILE_DOOR, anyCabinOpen + " " + allCabinClosed + " " + trunkOpen + "\n");
                         }
                         if (reply != null) reply.writeNoException();
                         return true;
