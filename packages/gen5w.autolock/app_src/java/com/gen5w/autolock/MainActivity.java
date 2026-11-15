@@ -51,6 +51,7 @@ public class MainActivity extends Activity {
 
     private final Handler handler = new Handler();
     private boolean updatingUi = false;
+    private boolean masterEnabled = true;
     private int currentDelaySec = DEFAULT_DELAY_SEC;
     private boolean ignoreHatch = true;
     private int detectedPhoneType = PHONE_NONE;
@@ -60,11 +61,16 @@ public class MainActivity extends Activity {
     private Button understandBtn;
     private int countdownRemaining = DISCLAIMER_WAIT_SEC;
 
+    private LinearLayout masterCard;
+    private TextView masterSubtitle;
     private Switch masterSwitch;
     private TextView masterBadge;
     private TextView savedBadge;
 
     // Dynamic workflow views
+    private LinearLayout flowCard;
+    private LinearLayout flowActiveRow;
+    private LinearLayout flowDisabledRow;
     private TextView stepTimerTitle;
     private LinearLayout stepPhonePanel;
     private View stepPhoneArrow;
@@ -138,6 +144,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        loadConfigToUi();
         handler.post(pollStatusRunnable);
     }
 
@@ -250,7 +257,7 @@ public class MainActivity extends Activity {
         container.setOrientation(LinearLayout.VERTICAL);
         container.setPadding(dp(24), dp(14), dp(24), dp(14));
 
-        // 1. Top Header Bar (Icon + Name + Version + Saved + Master Switch + Exit)
+        // 1. Top Header Bar (Icon + Name + Version + Saved + Exit)
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -291,27 +298,6 @@ public class MainActivity extends Activity {
         savedLp.rightMargin = dp(12);
         header.addView(savedBadge, savedLp);
 
-        masterBadge = new TextView(this);
-        masterBadge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        masterBadge.setTypeface(Typeface.DEFAULT_BOLD);
-        masterBadge.setPadding(dp(10), dp(4), dp(10), dp(4));
-        LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        badgeLp.rightMargin = dp(8);
-        header.addView(masterBadge, badgeLp);
-
-        masterSwitch = new Switch(this);
-        masterSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            updateMasterBadge(checked);
-            if (!updatingUi) {
-                saveSetting(FILE_ENABLED, checked ? "1" : "0");
-            }
-        });
-        LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        swLp.rightMargin = dp(16);
-        header.addView(masterSwitch, swLp);
-
         Button exitBtn = new Button(this);
         exitBtn.setText("Exit");
         exitBtn.setAllCaps(false);
@@ -325,37 +311,78 @@ public class MainActivity extends Activity {
 
         container.addView(header);
 
-        // 2. Dynamic Logic Workflow Panels Card
-        LinearLayout flowCard = new LinearLayout(this);
-        flowCard.setOrientation(LinearLayout.HORIZONTAL);
+        // 2. Dynamic Logic Workflow Panels Card (Active Workflow vs Switched OFF Notice)
+        flowCard = new LinearLayout(this);
+        flowCard.setOrientation(LinearLayout.VERTICAL);
         flowCard.setGravity(Gravity.CENTER_VERTICAL);
+        flowCard.setMinimumHeight(dp(116));
         flowCard.setBackground(makeRoundedBg(0xFF161B22, 0xFF263040, 14, 1));
-        flowCard.setPadding(dp(16), dp(16), dp(16), dp(16));
+        flowCard.setPadding(dp(16), dp(14), dp(16), dp(14));
 
-        flowCard.addView(buildFlowPanel(FlowIconView.ICON_IGNITION, "Ignition off and leave car"),
+        flowActiveRow = new LinearLayout(this);
+        flowActiveRow.setOrientation(LinearLayout.HORIZONTAL);
+        flowActiveRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        flowActiveRow.addView(buildFlowPanel(FlowIconView.ICON_IGNITION, "Ignition off and leave car"),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-        flowCard.addView(buildFlowArrow());
+        flowActiveRow.addView(buildFlowArrow());
 
         LinearLayout timerPanel = buildFlowPanel(
                 FlowIconView.ICON_TIMER,
                 buildTimerPanelLabel());
         stepTimerTitle = (TextView) timerPanel.findViewWithTag("panel_title");
-        flowCard.addView(timerPanel,
+        flowActiveRow.addView(timerPanel,
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.35f));
 
         stepPhoneArrow = buildFlowArrow();
-        flowCard.addView(stepPhoneArrow);
+        flowActiveRow.addView(stepPhoneArrow);
 
         stepPhonePanel = buildFlowPanel(
                 FlowIconView.ICON_SIGNAL,
                 "Wi-Fi Direct Phone signal gets weak");
         stepPhoneTitle = (TextView) stepPhonePanel.findViewWithTag("panel_title");
-        flowCard.addView(stepPhonePanel,
+        flowActiveRow.addView(stepPhonePanel,
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.2f));
 
-        flowCard.addView(buildFlowArrow());
-        flowCard.addView(buildFlowPanel(FlowIconView.ICON_LOCK, "Lock Doors"),
+        flowActiveRow.addView(buildFlowArrow());
+        flowActiveRow.addView(buildFlowPanel(FlowIconView.ICON_LOCK, "Lock Doors"),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.85f));
+
+        flowCard.addView(flowActiveRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        flowDisabledRow = new LinearLayout(this);
+        flowDisabledRow.setOrientation(LinearLayout.HORIZONTAL);
+        flowDisabledRow.setGravity(Gravity.CENTER_VERTICAL);
+        flowDisabledRow.setPadding(dp(10), dp(8), dp(10), dp(8));
+        flowDisabledRow.setVisibility(View.GONE);
+
+        FlowIconView offIcon = new FlowIconView(this, FlowIconView.ICON_DISABLED);
+        LinearLayout.LayoutParams offIconLp = new LinearLayout.LayoutParams(dp(46), dp(46));
+        offIconLp.rightMargin = dp(18);
+        flowDisabledRow.addView(offIcon, offIconLp);
+
+        LinearLayout offTextCol = new LinearLayout(this);
+        offTextCol.setOrientation(LinearLayout.VERTICAL);
+
+        TextView offTitle = new TextView(this);
+        offTitle.setText("Timed Auto-Lock is Switched OFF \u2014 Doors will NOT lock automatically");
+        offTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        offTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        offTitle.setTextColor(0xFFFCA5A5);
+        offTextCol.addView(offTitle);
+
+        TextView offSub = new TextView(this);
+        offSub.setText("Turn on the Master Auto-Lock switch below to re-enable walk-away locking.");
+        offSub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        offSub.setTextColor(0xFFCBD5E1);
+        offSub.setPadding(0, dp(3), 0, 0);
+        offTextCol.addView(offSub);
+
+        flowDisabledRow.addView(offTextCol, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        flowCard.addView(flowDisabledRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         LinearLayout.LayoutParams flowLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -452,7 +479,66 @@ public class MainActivity extends Activity {
         midLp.bottomMargin = dp(12);
         container.addView(midRow, midLp);
 
-        // 4. Bottom Card: Ignore Hatchback Checkbox (Default ON)
+        // 4. Bottom Row: Master On/Off Card (Left, Default ON) + Ignore Hatchback Checkbox (Right, Default ON)
+        LinearLayout bottomRow = new LinearLayout(this);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        masterCard = new LinearLayout(this);
+        masterCard.setOrientation(LinearLayout.HORIZONTAL);
+        masterCard.setGravity(Gravity.CENTER_VERTICAL);
+        masterCard.setBackground(makeRoundedBg(0xFF161B22, 0xFF10B981, 12, 1));
+        masterCard.setPadding(dp(20), dp(10), dp(20), dp(10));
+
+        LinearLayout masterTextCol = new LinearLayout(this);
+        masterTextCol.setOrientation(LinearLayout.VERTICAL);
+
+        TextView masterTitle = new TextView(this);
+        masterTitle.setText("Master Auto-Lock");
+        masterTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        masterTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        masterTitle.setTextColor(Color.WHITE);
+        masterTextCol.addView(masterTitle);
+
+        masterSubtitle = new TextView(this);
+        masterSubtitle.setText("Enabled \u2014 walk-away auto-lock active");
+        masterSubtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        masterSubtitle.setTextColor(0xFF34D399);
+        masterTextCol.addView(masterSubtitle);
+
+        masterCard.addView(masterTextCol, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        masterBadge = new TextView(this);
+        masterBadge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        masterBadge.setTypeface(Typeface.DEFAULT_BOLD);
+        masterBadge.setPadding(dp(10), dp(4), dp(10), dp(4));
+        LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        badgeLp.rightMargin = dp(10);
+        masterCard.addView(masterBadge, badgeLp);
+
+        masterSwitch = new Switch(this);
+        masterSwitch.setTextOn("ON");
+        masterSwitch.setTextOff("OFF");
+        masterSwitch.setSwitchMinWidth(dp(74));
+        masterSwitch.setThumbTextPadding(dp(10));
+        masterSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            masterEnabled = checked;
+            updateMasterUi(checked);
+            updateWorkflowPanels();
+            if (!updatingUi) {
+                saveSetting(FILE_ENABLED, checked ? "1" : "0");
+            }
+        });
+        masterCard.addView(masterSwitch, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        masterCard.setOnClickListener(v -> masterSwitch.toggle());
+
+        LinearLayout.LayoutParams masterCardLp = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f);
+        masterCardLp.rightMargin = dp(14);
+        bottomRow.addView(masterCard, masterCardLp);
+
         LinearLayout hatchCard = new LinearLayout(this);
         hatchCard.setOrientation(LinearLayout.HORIZONTAL);
         hatchCard.setGravity(Gravity.CENTER_VERTICAL);
@@ -474,8 +560,13 @@ public class MainActivity extends Activity {
         });
         hatchCard.addView(ignoreHatchCheck, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        hatchCard.setOnClickListener(v -> ignoreHatchCheck.toggle());
 
-        container.addView(hatchCard);
+        bottomRow.addView(hatchCard, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f));
+
+        container.addView(bottomRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         return container;
     }
@@ -547,6 +638,17 @@ public class MainActivity extends Activity {
     }
 
     private void updateWorkflowPanels() {
+        if (flowCard != null && flowActiveRow != null && flowDisabledRow != null) {
+            if (masterEnabled) {
+                flowActiveRow.setVisibility(View.VISIBLE);
+                flowDisabledRow.setVisibility(View.GONE);
+                flowCard.setBackground(makeRoundedBg(0xFF161B22, 0xFF263040, 14, 1));
+            } else {
+                flowActiveRow.setVisibility(View.GONE);
+                flowDisabledRow.setVisibility(View.VISIBLE);
+                flowCard.setBackground(makeRoundedBg(0xFF1F161A, 0xFFEF4444, 14, 1));
+            }
+        }
         if (stepTimerTitle != null) {
             stepTimerTitle.setText(buildTimerPanelLabel());
         }
@@ -620,24 +722,49 @@ public class MainActivity extends Activity {
         phoneLight.setBackground(gd);
     }
 
-    private void updateMasterBadge(boolean on) {
-        if (on) {
-            masterBadge.setText("ON");
-            masterBadge.setTextColor(0xFF34D399);
-            masterBadge.setBackground(makeRoundedBg(0xFF064E3B, 0xFF10B981, 6, 1));
-        } else {
-            masterBadge.setText("OFF");
-            masterBadge.setTextColor(0xFF94A3B8);
-            masterBadge.setBackground(makeRoundedBg(0xFF1E293B, 0xFF334155, 6, 1));
+    private void updateMasterUi(boolean on) {
+        if (masterBadge != null) {
+            if (on) {
+                masterBadge.setText("ON");
+                masterBadge.setTextColor(0xFF34D399);
+                masterBadge.setBackground(makeRoundedBg(0xFF064E3B, 0xFF10B981, 6, 1));
+            } else {
+                masterBadge.setText("OFF");
+                masterBadge.setTextColor(0xFFFCA5A5);
+                masterBadge.setBackground(makeRoundedBg(0xFF450A0A, 0xFFEF4444, 6, 1));
+            }
+        }
+        if (masterSubtitle != null) {
+            if (on) {
+                masterSubtitle.setText("Enabled \u2014 walk-away auto-lock active");
+                masterSubtitle.setTextColor(0xFF34D399);
+            } else {
+                masterSubtitle.setText("Disabled \u2014 doors will not auto-lock");
+                masterSubtitle.setTextColor(0xFFFCA5A5);
+            }
+        }
+        if (masterCard != null) {
+            if (on) {
+                masterCard.setBackground(makeRoundedBg(0xFF161B22, 0xFF10B981, 12, 1));
+            } else {
+                masterCard.setBackground(makeRoundedBg(0xFF1F161A, 0xFFEF4444, 12, 1));
+            }
         }
     }
 
     private void loadConfigToUi() {
         updatingUi = true;
         try {
-            boolean enabled = "1".equals(readString(FILE_ENABLED).trim());
-            masterSwitch.setChecked(enabled);
-            updateMasterBadge(enabled);
+            File enabledFile = new File(FILE_ENABLED);
+            if (!enabledFile.exists()) {
+                masterEnabled = true;
+                writeString(FILE_ENABLED, "1");
+            } else {
+                String enabledStr = readString(FILE_ENABLED).trim();
+                masterEnabled = enabledStr.isEmpty() || "1".equals(enabledStr);
+            }
+            masterSwitch.setChecked(masterEnabled);
+            updateMasterUi(masterEnabled);
 
             String hatchStr = readString(FILE_IGNORE_HATCH).trim();
             ignoreHatch = hatchStr.isEmpty() || "1".equals(hatchStr);
@@ -711,6 +838,7 @@ public class MainActivity extends Activity {
         static final int ICON_SIGNAL = 3;
         static final int ICON_LOCK = 4;
         static final int ICON_WARNING = 5;
+        static final int ICON_DISABLED = 6;
 
         private final int type;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -746,6 +874,34 @@ public class MainActivity extends Activity {
                 paint.setStyle(Paint.Style.FILL);
                 c.drawRoundRect(new RectF(cx - 4f * s, 38f * s, cx + 4f * s, 64f * s), 4f * s, 4f * s, paint);
                 c.drawCircle(cx, 74f * s, 4.5f * s, paint);
+                return;
+            }
+
+            if (type == ICON_DISABLED) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFF281217);
+                c.drawCircle(cx, cy, 46f * s, paint);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(3.5f * s);
+                paint.setColor(0xFFEF4444);
+                c.drawCircle(cx, cy, 46f * s, paint);
+
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(5f * s);
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                paint.setColor(0xFF94A3B8);
+                rect.set(cx - 12f * s, 24f * s, cx + 12f * s, 48f * s);
+                c.drawArc(rect, 180, 180, false, paint);
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xFF475569);
+                rect.set(30f * s, 42f * s, 70f * s, 74f * s);
+                c.drawRoundRect(rect, 6f * s, 6f * s, paint);
+
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(6.5f * s);
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                paint.setColor(0xFFEF4444);
+                c.drawLine(24f * s, 76f * s, 76f * s, 24f * s, paint);
                 return;
             }
 

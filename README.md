@@ -48,13 +48,13 @@ IN NO EVENT SHALL THE AUTHOR(S) OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES
 ## Interface & Controls
 
 - **5-Second Safety Notice on Launch:** Requires acknowledging the key fob lockout warning before accessing controls.
-- **Dynamic Logic Workflow Display:** Updates live on screen to reflect your delay setting, hatchback preference, and currently detected phone type (`Wi-Fi Direct`, `Bluetooth`, or `Timer only`).
+- **Dynamic Logic Workflow Display:** Updates live on screen to reflect whether Master Auto-Lock is **ON** or **OFF**, your delay setting, hatchback preference, and currently detected phone type (`Wi-Fi Direct`, `Bluetooth`, or `Timer only`).
 - **Phone Connection Status Box:** Live green/red indicator showing:
   - `Wi-Fi Direct Phone Connected` *(Green)*
   - `Bluetooth Phone Connected` *(Green)*
   - `No Phone Detected, Timer only` *(Red)*
 - **Large Touch Delay Stepper (`-` / `+`):** Adjust lock delay from `5s` to `20s` with instant `✓ Saved` confirmation.
-- **Master On/Off & Background Service:** Continues monitoring doors, Wi-Fi Direct, and Bluetooth in the background after you tap **Exit**.
+- **Master Auto-Lock Switch (Default ON) & Background Service:** Toggle auto-locking **ON** or **OFF** directly on the settings page without uninstalling; continues monitoring in the background after you tap **Exit**.
 
 ---
 
