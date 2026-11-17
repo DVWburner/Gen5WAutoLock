@@ -47,14 +47,14 @@ IN NO EVENT SHALL THE AUTHOR(S) OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES
 
 ## Interface & Controls
 
-- **5-Second Safety Notice on Launch:** Requires acknowledging the key fob lockout warning before accessing controls.
+- **8-Second Safety Notice on Launch:** Requires reading and acknowledging the key fob lockout warning before accessing settings and enabling auto-lock.
 - **Dynamic Logic Workflow Display:** Updates live on screen to reflect whether Master Auto-Lock is **ON** or **OFF**, your delay setting, hatchback preference, and currently detected phone type (`Wi-Fi Direct`, `Bluetooth`, or `Timer only`).
 - **Phone Connection Status Box:** Live green/red indicator showing:
   - `Wi-Fi Direct Phone Connected` *(Green)*
   - `Bluetooth Phone Connected` *(Green)*
   - `No Phone Detected, Timer only` *(Red)*
 - **Large Touch Delay Stepper (`-` / `+`):** Adjust lock delay from `5s` to `20s` with instant `✓ Saved` confirmation.
-- **Master Auto-Lock Switch (Default ON) & Background Service:** Toggle auto-locking **ON** or **OFF** directly on the settings page without uninstalling; continues monitoring in the background after you tap **Exit**.
+- **Master Auto-Lock Switch (Default OFF) & Background Service:** Starts **OFF** on fresh install so you must acknowledge the safety notice before activating auto-lock; toggle **ON** or **OFF** anytime on the settings page without uninstalling. Continues monitoring in the background after you tap **Exit**.
 
 ---
 
@@ -74,6 +74,9 @@ Install `gen5w.autolock` (**Timed Auto-Lock**) via the [NEMESIS Package Store](h
 1. Download **`gen5w.autolock-1.5.0-USB.zip`** from the [**v1.5.0 Release**](../../releases/tag/v1.5.0) (contains both `NEMESIS.data` and `gen5w.autolock-1.5.0.zip`), or copy both files from [`dist/autolock-installer/`](dist/autolock-installer/).
 2. Extract both `NEMESIS.data` and `gen5w.autolock-1.5.0.zip` to the root of a FAT32/exFAT USB drive.
 3. Insert the USB drive into your NEMESIS-equipped Gen5W head unit to install.
+
+### First-Time Activation
+Open **Timed Auto-Lock** from your head unit app launcher, read and acknowledge the **8-second Important Safety Notice** (`I Understand`), and switch **Master Auto-Lock** **ON** to activate automatic door locking.
 
 ---
 

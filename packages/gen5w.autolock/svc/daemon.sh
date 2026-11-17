@@ -15,7 +15,7 @@ WIFI_STATE_FILE="$BASE/wifi_state"
 STATUS_FILE="$BASE/status"
 LOCAL_LOG="$BASE/autolock.log"
 
-[ -f "$CFG_ENABLED" ] || echo "1" > "$CFG_ENABLED"
+[ -f "$CFG_ENABLED" ] || echo "0" > "$CFG_ENABLED"
 [ -f "$CFG_DELAY" ] || echo "10" > "$CFG_DELAY"
 [ -f "$CFG_IGNORE_HATCH" ] || echo "1" > "$CFG_IGNORE_HATCH"
 [ -f "$DOOR_FILE" ] || echo "0 1 0" > "$DOOR_FILE"
@@ -167,7 +167,7 @@ while true; do
     enabled=$(cat "$CFG_ENABLED" 2>/dev/null)
     delay=$(cat "$CFG_DELAY" 2>/dev/null)
     ignore_hatch=$(cat "$CFG_IGNORE_HATCH" 2>/dev/null)
-    [ -z "$enabled" ] && enabled=1
+    [ -z "$enabled" ] && enabled=0
     [ -z "$delay" ] && delay=10
     [ -z "$ignore_hatch" ] && ignore_hatch=1
 

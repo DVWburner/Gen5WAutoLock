@@ -43,7 +43,7 @@ public class MainActivity extends Activity {
     private static final int MIN_DELAY_SEC = 5;
     private static final int MAX_DELAY_SEC = 20;
     private static final int DEFAULT_DELAY_SEC = 10;
-    private static final int DISCLAIMER_WAIT_SEC = 5;
+    private static final int DISCLAIMER_WAIT_SEC = 8;
 
     private static final int PHONE_NONE = 0;
     private static final int PHONE_BT = 1;
@@ -51,7 +51,7 @@ public class MainActivity extends Activity {
 
     private final Handler handler = new Handler();
     private boolean updatingUi = false;
-    private boolean masterEnabled = true;
+    private boolean masterEnabled = false;
     private int currentDelaySec = DEFAULT_DELAY_SEC;
     private boolean ignoreHatch = true;
     private int detectedPhoneType = PHONE_NONE;
@@ -757,11 +757,11 @@ public class MainActivity extends Activity {
         try {
             File enabledFile = new File(FILE_ENABLED);
             if (!enabledFile.exists()) {
-                masterEnabled = true;
-                writeString(FILE_ENABLED, "1");
+                masterEnabled = false;
+                writeString(FILE_ENABLED, "0");
             } else {
                 String enabledStr = readString(FILE_ENABLED).trim();
-                masterEnabled = enabledStr.isEmpty() || "1".equals(enabledStr);
+                masterEnabled = "1".equals(enabledStr);
             }
             masterSwitch.setChecked(masterEnabled);
             updateMasterUi(masterEnabled);
