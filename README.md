@@ -1,4 +1,4 @@
-# Timed Auto-Lock (`gen5w.autolock`) — v1.5.0
+# Timed Auto-Lock (`gen5w.autolock`) — v1.6.0
 
 > **AI-Generated Project Notice:** This project (including its Android application, root daemon script, icons, and packaging tools) is **AI-generated**.
 
@@ -37,24 +37,26 @@ IN NO EVENT SHALL THE AUTHOR(S) OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES
 2. **Driver & Passengers Exit:** Waits for a door to open and then for all doors to close.
    - **Ignore Hatchback Being Open (Default ON):** When checked, the rear hatch / power tailgate is ignored by the timer. When unchecked, the timer waits for the rear hatch to close as well.
 3. **Configurable Delay (`5–20s`):** Counts down your chosen delay (`5` to `20` seconds, default `10s`) after the last door closes.
-4. **Automatic Phone Proximity Detection (No Toggle Required):**
-   - **Wi-Fi Direct (Wireless CarPlay / Android Auto — Priority):** If a phone is connected over Wi-Fi Direct (`wlan0`), the daemon holds off locking after the timer until your phone drops out of range (~15–20 ft outside the car).
+4. **Automatic Phone Proximity Detection (Required by Default):**
+   - **Wi-Fi Direct (Wireless CarPlay / Android Auto — Priority):** If a phone is connected over Wi-Fi Direct (`p2p*` / `wlan0`), the daemon holds off locking after the timer until your phone drops out of range (~15–20 ft outside the car).
    - **Bluetooth (`HFP` / `A2DP` — Fallback):** If no Wi-Fi Direct phone is detected but a Bluetooth phone is connected, the daemon waits until Bluetooth disconnects.
-   - **Timer Only:** If no phone is detected, the doors lock automatically as soon as the countdown finishes.
-5. **Final Safety Check & Lock:** Verifies all monitored doors are still closed right before issuing `IBCMService.lockDoor(true)`.
+   - **Require Phone (Wi-Fi or Bluetooth) (Default ON):** When checked, auto-locking **will not trigger on the timer alone** if no phone is detected. Uncheck this option in the app if you want timer-only fallback when no phone is connected.
+5. **Final Safety Check & Lock:** Verifies all monitored doors are still closed and checks that the vehicle is not already locked before issuing `IBCMService.lockDoor(true)`.
 
 ---
 
 ## Interface & Controls
 
 - **8-Second Safety Notice on Launch:** Requires reading and acknowledging the key fob lockout warning before accessing settings and enabling auto-lock.
-- **Dynamic Logic Workflow Display:** Updates live on screen to reflect whether Master Auto-Lock is **ON** or **OFF**, your delay setting, hatchback preference, and currently detected phone type (`Wi-Fi Direct`, `Bluetooth`, or `Timer only`).
+- **Dynamic Logic Workflow Display:** Updates live on screen to reflect whether Master Auto-Lock is **ON** or **OFF**, your delay setting, hatchback preference, `Require Phone` setting, and currently detected phone connection (`Wi-Fi Direct`, `Bluetooth`, `Phone Required`, or `Timer only`).
 - **Phone Connection Status Box:** Live green/red indicator showing:
   - `Wi-Fi Direct Phone Connected` *(Green)*
   - `Bluetooth Phone Connected` *(Green)*
-  - `No Phone Detected, Timer only` *(Red)*
+  - `No Phone Detected — Required to Lock` *(Red, when `Require Phone` is ON)*
+  - `No Phone Detected, Timer only` *(Red, when `Require Phone` is OFF)*
 - **Large Touch Delay Stepper (`-` / `+`):** Adjust lock delay from `5s` to `20s` with instant `✓ Saved` confirmation.
 - **Master Auto-Lock Switch (Default OFF) & Background Service:** Starts **OFF** on fresh install so you must acknowledge the safety notice before activating auto-lock; toggle **ON** or **OFF** anytime on the settings page without uninstalling. Continues monitoring in the background after you tap **Exit**.
+- **Require Phone & Ignore Hatchback Checkboxes (Both Default ON):** Control whether a detected Wi-Fi/Bluetooth phone is mandatory to lock and whether an open rear hatch is ignored.
 
 ---
 
@@ -71,8 +73,8 @@ IN NO EVENT SHALL THE AUTHOR(S) OR CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES
 Install `gen5w.autolock` (**Timed Auto-Lock**) via the [NEMESIS Package Store](https://xwtk.cloud/services/nemesis/).
 
 ### Option 2: USB Drive (`NEMESIS.data`)
-1. Download **`gen5w.autolock-1.5.0-USB.zip`** from the [**v1.5.0 Release**](../../releases/tag/v1.5.0) (contains both `NEMESIS.data` and `gen5w.autolock-1.5.0.zip`), or copy both files from [`dist/autolock-installer/`](dist/autolock-installer/).
-2. Extract both `NEMESIS.data` and `gen5w.autolock-1.5.0.zip` to the root of a FAT32/exFAT USB drive.
+1. Download **`gen5w.autolock-1.6.0-USB.zip`** from the [**v1.6.0 Release**](../../releases/tag/v1.6.0) (contains both `NEMESIS.data` and `gen5w.autolock-1.6.0.zip`), or copy both files from [`dist/autolock-installer/`](dist/autolock-installer/).
+2. Extract both `NEMESIS.data` and `gen5w.autolock-1.6.0.zip` to the root of a FAT32/exFAT USB drive.
 3. Insert the USB drive into your NEMESIS-equipped Gen5W head unit to install.
 
 ### First-Time Activation
@@ -91,5 +93,6 @@ python scripts/build_package.py
 
 Outputs:
 - `packages/gen5w.autolock/app/Gen5WAutoLock.apk`
-- `dist/autolock-installer/gen5w.autolock-1.5.0.zip`
+- `dist/autolock-installer/gen5w.autolock-1.6.0.zip`
+- `dist/autolock-installer/gen5w.autolock-1.6.0-USB.zip`
 - `dist/autolock-installer/NEMESIS.data`

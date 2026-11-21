@@ -1,8 +1,6 @@
 package com.gen5w.autolock;
 
 import android.app.Activity;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Canvas;
@@ -31,12 +29,13 @@ import java.io.FileReader;
 import java.io.FileWriter;
 
 public class MainActivity extends Activity {
-    public static final String APP_VERSION = "v1.5.0";
+    public static final String APP_VERSION = "v1.6.0";
 
     private static final String BASE_DIR = "/data/nemesis/autolock";
     private static final String FILE_ENABLED = BASE_DIR + "/enabled";
     private static final String FILE_DELAY = BASE_DIR + "/delay";
     private static final String FILE_IGNORE_HATCH = BASE_DIR + "/ignore_hatch";
+    private static final String FILE_REQUIRE_PHONE = BASE_DIR + "/require_phone";
     private static final String FILE_WIFI_STATE = BASE_DIR + "/wifi_state";
     private static final String FILE_BT_CONN = BASE_DIR + "/bt_connected";
 
@@ -54,6 +53,7 @@ public class MainActivity extends Activity {
     private boolean masterEnabled = false;
     private int currentDelaySec = DEFAULT_DELAY_SEC;
     private boolean ignoreHatch = true;
+    private boolean requirePhone = true;
     private int detectedPhoneType = PHONE_NONE;
 
     private FrameLayout disclaimerOverlay;
@@ -80,8 +80,9 @@ public class MainActivity extends Activity {
     private View phoneLight;
     private TextView phoneStatusTitle;
 
-    // Stepper & hatch checkbox
+    // Stepper & option checkboxes
     private TextView delayNumberText;
+    private CheckBox requirePhoneCheck;
     private CheckBox ignoreHatchCheck;
 
     private final Runnable disclaimerTick = new Runnable() {
@@ -136,22 +137,27 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         setContentView(root);
-        loadConfigToUi();
-        refreshPhoneDetection();
-        handler.postDelayed(disclaimerTick, 1000);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         loadConfigToUi();
+        handler.removeCallbacks(pollStatusRunnable);
         handler.post(pollStatusRunnable);
+        if (disclaimerOverlay != null
+                && disclaimerOverlay.getVisibility() == View.VISIBLE
+                && countdownRemaining > 0) {
+            handler.removeCallbacks(disclaimerTick);
+            handler.postDelayed(disclaimerTick, 1000);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         handler.removeCallbacks(pollStatusRunnable);
+        handler.removeCallbacks(disclaimerTick);
     }
 
     @Override
@@ -202,9 +208,9 @@ public class MainActivity extends Activity {
 
         TextView msgSecondary = new TextView(this);
         msgSecondary.setText(
-                "The doors will automatically lock after the timer expires even if the key is left inside.\n\n"
+                "When enabled, the doors can automatically lock even if your key is left inside.\n\n"
                 + "Always be careful and keep an alternate way to unlock your car available "
-                + "(such as the phone app, a physical key, or an alternate fob).");
+                + "(such as the phone app, NFC key card, physical key, or spare fob).");
         msgSecondary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         msgSecondary.setTextColor(0xFFCBD5E1);
         msgSecondary.setGravity(Gravity.CENTER);
@@ -409,7 +415,7 @@ public class MainActivity extends Activity {
         phoneTextCol.setOrientation(LinearLayout.VERTICAL);
 
         TextView phoneHdr = new TextView(this);
-        phoneHdr.setText("Phone Proximity Monitor (Automatic)");
+        phoneHdr.setText("Phone Proximity Status (Wi-Fi Direct > Bluetooth)");
         phoneHdr.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         phoneHdr.setTextColor(0xFF94A3B8);
         phoneTextCol.addView(phoneHdr);
@@ -479,14 +485,14 @@ public class MainActivity extends Activity {
         midLp.bottomMargin = dp(12);
         container.addView(midRow, midLp);
 
-        // 4. Bottom Row: Master On/Off Card (Left, Default ON) + Ignore Hatchback Checkbox (Right, Default ON)
+        // 4. Bottom Row: Master On/Off Card (Left, Default OFF) + Options Card (Right: Require Phone & Ignore Hatchback, Default ON)
         LinearLayout bottomRow = new LinearLayout(this);
         bottomRow.setOrientation(LinearLayout.HORIZONTAL);
 
         masterCard = new LinearLayout(this);
         masterCard.setOrientation(LinearLayout.HORIZONTAL);
         masterCard.setGravity(Gravity.CENTER_VERTICAL);
-        masterCard.setBackground(makeRoundedBg(0xFF161B22, 0xFF10B981, 12, 1));
+        masterCard.setBackground(makeRoundedBg(0xFF1F161A, 0xFFEF4444, 12, 1));
         masterCard.setPadding(dp(20), dp(10), dp(20), dp(10));
 
         LinearLayout masterTextCol = new LinearLayout(this);
@@ -500,9 +506,9 @@ public class MainActivity extends Activity {
         masterTextCol.addView(masterTitle);
 
         masterSubtitle = new TextView(this);
-        masterSubtitle.setText("Enabled \u2014 walk-away auto-lock active");
+        masterSubtitle.setText("Disabled \u2014 doors will not auto-lock");
         masterSubtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        masterSubtitle.setTextColor(0xFF34D399);
+        masterSubtitle.setTextColor(0xFFFCA5A5);
         masterTextCol.addView(masterSubtitle);
 
         masterCard.addView(masterTextCol, new LinearLayout.LayoutParams(
@@ -535,19 +541,38 @@ public class MainActivity extends Activity {
         masterCard.setOnClickListener(v -> masterSwitch.toggle());
 
         LinearLayout.LayoutParams masterCardLp = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f);
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 0.95f);
         masterCardLp.rightMargin = dp(14);
         bottomRow.addView(masterCard, masterCardLp);
 
-        LinearLayout hatchCard = new LinearLayout(this);
-        hatchCard.setOrientation(LinearLayout.HORIZONTAL);
-        hatchCard.setGravity(Gravity.CENTER_VERTICAL);
-        hatchCard.setBackground(makeRoundedBg(0xFF161B22, 0xFF263040, 12, 1));
-        hatchCard.setPadding(dp(20), dp(10), dp(20), dp(10));
+        LinearLayout optionsCard = new LinearLayout(this);
+        optionsCard.setOrientation(LinearLayout.VERTICAL);
+        optionsCard.setGravity(Gravity.CENTER_VERTICAL);
+        optionsCard.setBackground(makeRoundedBg(0xFF161B22, 0xFF263040, 12, 1));
+        optionsCard.setPadding(dp(18), dp(8), dp(18), dp(8));
+
+        requirePhoneCheck = new CheckBox(this);
+        requirePhoneCheck.setText("Require Phone (Wi-Fi or Bluetooth)");
+        requirePhoneCheck.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        requirePhoneCheck.setTypeface(Typeface.DEFAULT_BOLD);
+        requirePhoneCheck.setTextColor(Color.WHITE);
+        requirePhoneCheck.setPadding(dp(8), 0, 0, 0);
+        requirePhoneCheck.setOnCheckedChangeListener((btn, checked) -> {
+            requirePhone = checked;
+            updatePhoneStatusUi();
+            updateWorkflowPanels();
+            if (!updatingUi) {
+                saveSetting(FILE_REQUIRE_PHONE, checked ? "1" : "0");
+            }
+        });
+        LinearLayout.LayoutParams reqLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        reqLp.bottomMargin = dp(4);
+        optionsCard.addView(requirePhoneCheck, reqLp);
 
         ignoreHatchCheck = new CheckBox(this);
         ignoreHatchCheck.setText("Ignore Hatchback being open");
-        ignoreHatchCheck.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        ignoreHatchCheck.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         ignoreHatchCheck.setTypeface(Typeface.DEFAULT_BOLD);
         ignoreHatchCheck.setTextColor(Color.WHITE);
         ignoreHatchCheck.setPadding(dp(8), 0, 0, 0);
@@ -558,12 +583,11 @@ public class MainActivity extends Activity {
                 saveSetting(FILE_IGNORE_HATCH, checked ? "1" : "0");
             }
         });
-        hatchCard.addView(ignoreHatchCheck, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        hatchCard.setOnClickListener(v -> ignoreHatchCheck.toggle());
+        optionsCard.addView(ignoreHatchCheck, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        bottomRow.addView(hatchCard, new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f));
+        bottomRow.addView(optionsCard, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 1.05f));
 
         container.addView(bottomRow, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -657,10 +681,17 @@ public class MainActivity extends Activity {
                 stepPhoneArrow.setVisibility(View.VISIBLE);
                 stepPhonePanel.setVisibility(View.VISIBLE);
                 stepPhoneTitle.setText("Wi-Fi Direct Phone signal gets weak");
+                stepPhoneTitle.setTextColor(Color.WHITE);
             } else if (detectedPhoneType == PHONE_BT) {
                 stepPhoneArrow.setVisibility(View.VISIBLE);
                 stepPhonePanel.setVisibility(View.VISIBLE);
                 stepPhoneTitle.setText("Bluetooth Phone signal gets weak");
+                stepPhoneTitle.setTextColor(Color.WHITE);
+            } else if (requirePhone) {
+                stepPhoneArrow.setVisibility(View.VISIBLE);
+                stepPhonePanel.setVisibility(View.VISIBLE);
+                stepPhoneTitle.setText("Phone Required (Wi-Fi / BT not detected)");
+                stepPhoneTitle.setTextColor(0xFFFCA5A5);
             } else {
                 stepPhoneArrow.setVisibility(View.GONE);
                 stepPhonePanel.setVisibility(View.GONE);
@@ -679,38 +710,41 @@ public class MainActivity extends Activity {
         }
 
         int btConn = "1".equals(readString(FILE_BT_CONN).trim()) ? 1 : 0;
-        if (btConn == 0) {
-            try {
-                BluetoothAdapter ba = BluetoothAdapter.getDefaultAdapter();
-                if (ba != null) {
-                    int hfp = ba.getProfileConnectionState(BluetoothProfile.HEADSET);
-                    int a2dp = ba.getProfileConnectionState(BluetoothProfile.A2DP);
-                    if (hfp == 2 || a2dp == 2) {
-                        btConn = 1;
-                    }
-                }
-            } catch (Throwable ignored) {
-            }
+        if (btConn == 0 && AutoLockBridgeService.isBluetoothPhoneConnected()) {
+            btConn = 1;
         }
 
         // Priority: Wi-Fi Direct beats Bluetooth; neither -> No Phone Detected
         if (wifiConn == 1) {
             detectedPhoneType = PHONE_WIFI;
+        } else if (btConn == 1) {
+            detectedPhoneType = PHONE_BT;
+        } else {
+            detectedPhoneType = PHONE_NONE;
+        }
+        updatePhoneStatusUi();
+        updateWorkflowPanels();
+    }
+
+    private void updatePhoneStatusUi() {
+        if (phoneStatusTitle == null) return;
+        if (detectedPhoneType == PHONE_WIFI) {
             setStatusLight(0xFF10B981, 0xFF34D399);
             phoneStatusTitle.setText("Wi-Fi Direct Phone Connected");
             phoneStatusTitle.setTextColor(0xFF34D399);
-        } else if (btConn == 1) {
-            detectedPhoneType = PHONE_BT;
+        } else if (detectedPhoneType == PHONE_BT) {
             setStatusLight(0xFF10B981, 0xFF34D399);
             phoneStatusTitle.setText("Bluetooth Phone Connected");
             phoneStatusTitle.setTextColor(0xFF34D399);
         } else {
-            detectedPhoneType = PHONE_NONE;
             setStatusLight(0xFFEF4444, 0xFFFCA5A5);
-            phoneStatusTitle.setText("No Phone Detected, Timer only");
+            if (requirePhone) {
+                phoneStatusTitle.setText("No Phone Detected \u2014 Required to Lock");
+            } else {
+                phoneStatusTitle.setText("No Phone Detected, Timer only");
+            }
             phoneStatusTitle.setTextColor(0xFFFCA5A5);
         }
-        updateWorkflowPanels();
     }
 
     private void setStatusLight(int fill, int stroke) {
@@ -766,6 +800,16 @@ public class MainActivity extends Activity {
             masterSwitch.setChecked(masterEnabled);
             updateMasterUi(masterEnabled);
 
+            File reqPhoneFile = new File(FILE_REQUIRE_PHONE);
+            if (!reqPhoneFile.exists()) {
+                requirePhone = true;
+                writeString(FILE_REQUIRE_PHONE, "1");
+            } else {
+                String reqStr = readString(FILE_REQUIRE_PHONE).trim();
+                requirePhone = reqStr.isEmpty() || "1".equals(reqStr);
+            }
+            requirePhoneCheck.setChecked(requirePhone);
+
             String hatchStr = readString(FILE_IGNORE_HATCH).trim();
             ignoreHatch = hatchStr.isEmpty() || "1".equals(hatchStr);
             ignoreHatchCheck.setChecked(ignoreHatch);
@@ -782,6 +826,7 @@ public class MainActivity extends Activity {
             if (del > MAX_DELAY_SEC) del = MAX_DELAY_SEC;
             currentDelaySec = del;
             delayNumberText.setText(currentDelaySec + "s");
+            updatePhoneStatusUi();
             updateWorkflowPanels();
         } finally {
             updatingUi = false;
@@ -809,8 +854,30 @@ public class MainActivity extends Activity {
     }
 
     private static boolean writeString(String path, String content) {
-        try (FileWriter fw = new FileWriter(path, false)) {
+        File target = new File(path);
+        File tmp = new File(path + ".tmp");
+        try {
+            File parent = target.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
+            try (FileWriter fw = new FileWriter(tmp, false)) {
+                fw.write(content);
+            }
+            tmp.setReadable(true, false);
+            tmp.setWritable(true, false);
+            if (tmp.renameTo(target)) {
+                target.setReadable(true, false);
+                target.setWritable(true, false);
+                return true;
+            }
+            tmp.delete();
+        } catch (Throwable ignored) {
+        }
+        try (FileWriter fw = new FileWriter(target, false)) {
             fw.write(content);
+            target.setReadable(true, false);
+            target.setWritable(true, false);
             return true;
         } catch (Throwable ignored) {
             return false;

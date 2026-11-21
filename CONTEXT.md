@@ -4,43 +4,51 @@
 - **Vehicle & Head Unit:** Pre-2024 Hyundai Ioniq 5 (`NEEV.USA.S5W_M.V015.012.260507`) running Hyundai Mobis Wide Gen5W infotainment.
 - **Operating System:** Android 4.4.2 KitKat (API level 19, 32-bit ARMv7, TCC897x SoC), screen resolution `1280x720` (or ultrawide split with `720px` height).
 - **Execution Environment:** Rooted via **NEMESIS** (`hmg_nemesis`), which supports installing packages composed of an Android APK (`[app.0]`) and a persistent background root shell service (`[service.0]`).
-- **Purpose:** Provide reliable Walk-Away Auto Door Locking when the driver parks, turns off ignition (`IGN OFF`), exits the vehicle, and all 4 cabin doors close (excluding the rear hatch/5th door), with a configurable delay (`5s`, `10s`, `15s`, `20s`), a final safety check that no cabin door is ajar before locking, and an optional Bluetooth disconnect requirement.
+- **Purpose:** Provide Walk-Away Auto Door Locking when the driver parks, turns off ignition (`IGN OFF`), exits the vehicle, and all monitored doors close (optionally ignoring rear hatch/trunk, default **ON**), with a configurable delay (`5s`–`20s`, default `10s`), automatic phone proximity detection (Wi-Fi Direct priority, Bluetooth fallback, with **Require Phone** default **ON**), a final check that all cabin doors are closed and not already locked, and an 8-second key-fob safety warning gate on launch (**Master Auto-Lock** default **OFF** on fresh install).
 
 ---
 
-## 2. Architecture (`MainActivity.java` + `daemon.sh`)
-Because Android 4.4.2 restricts normal non-system apps from calling privileged Binder services directly via `service call`, while `/system/bin/sh` root scripts cannot easily implement complex `android.os.Binder` callback interfaces (`IBCMListener`) or query the Android `BluetoothAdapter` profile connection state APIs, the project uses a hybrid two-part architecture communicating through `/data/nemesis/autolock/`:
+## 2. Architecture (`MainActivity.java` + `AutoLockBridgeService.java` + `daemon.sh`)
+Because Android 4.4.2 restricts normal non-system apps from calling privileged Binder services directly via `service call`, while `/system/bin/sh` root scripts cannot easily implement complex `android.os.Binder` callback interfaces (`IBCMListener`) or query Android's `BluetoothAdapter` profile state APIs, the project uses a hybrid architecture communicating atomically through `/data/nemesis/autolock/`:
 
-### A. Android UI & Event Bridge (`com.gen5w.autolock/.MainActivity`)
+### A. Background Android Bridge Service (`AutoLockBridgeService.java` + `BootReceiver.java`)
+- **Sources:**
+  - `packages/gen5w.autolock/app_src/java/com/gen5w/autolock/AutoLockBridgeService.java`
+  - `packages/gen5w.autolock/app_src/java/com/gen5w/autolock/BootReceiver.java`
+- **Role:**
+  1. **Lifecycle:** Started at `BOOT_COMPLETED` by `BootReceiver`, on UI launch by `MainActivity`, and monitored/restarted every ~15s if missing by `daemon.sh` via `am startservice`.
+  2. **Binder Callback Listener (`com.hkmc.bcm.IBCMListener`):**
+     - Obtains `com.hkmc.micom.bcm` via reflection on `android.os.ServiceManager.getService(...)`.
+     - Registers via `IBCMService.registerBCMListener(IBCMListener, IBinder)` (transaction code `1`).
+     - Decodes transaction `2` (`onDoorAllStateChanged(10 ints)`):
+       - Writes `<anyCabinOpen> <allCabinClosed> <trunkOpen>` atomically to `/data/nemesis/autolock/door_state`.
+       - Writes `<allLocked> <drvUnlock> <pasUnlock> <rlUnlock> <rrUnlock>` (`0 = locked`, `1 = unlocked`) atomically to `/data/nemesis/autolock/lock_state`.
+  3. **Bluetooth Connection Monitor (`1s` poll):**
+     - Polls `BluetoothAdapter.getProfileConnectionState(BluetoothProfile.HEADSET)` and `BluetoothProfile.A2DP`.
+     - Writes `"1"` or `"0"` atomically to `/data/nemesis/autolock/bt_connected`.
+
+### B. Android Settings UI (`MainActivity.java`)
 - **Source:** `packages/gen5w.autolock/app_src/java/com/gen5w/autolock/MainActivity.java`
 - **Role:**
-  1. **User Interface:** Provides switches for enabling/disabling Auto-Lock, enabling/disabling the optional Bluetooth disconnect check, selecting the countdown timer (`5s`, `10s`, `15s`, `20s`), manually testing Lock/Unlock in Park, and viewing the live log.
-  2. **Binder Callback Listener (`com.hkmc.bcm.IBCMListener`):**
-     - Uses reflection (`android.os.ServiceManager.getService("com.hkmc.micom.bcm")`) to obtain the raw `IBinder` for the MICOM Body Control Module service (`com.hkmc.bcm.IBCMService`).
-     - Registers a custom `android.os.Binder` implementation via `IBCMService.registerBCMListener(IBCMListener, IBinder)` (transaction code `1`).
-     - Receives real-time callbacks pushed by MICOM whenever door open/lock states, ignition, ACC, or gear change.
-     - Specifically decodes transaction `2` (`onDoorAllStateChanged(int, int, int, int, int, int, int, int, int, int)`) and writes `<anyCabinOpen> <allCabinClosed>` to `/data/nemesis/autolock/door_state`.
-  3. **Bluetooth Connection Monitor:**
-     - Polls `BluetoothAdapter.getDefaultAdapter().getProfileConnectionState(BluetoothProfile.HEADSET)` (`HFP`) and `BluetoothProfile.A2DP` (`A2DP`).
-     - Writes `1` (connected) or `0` (disconnected) to `/data/nemesis/autolock/bt_connected` every second while active.
+  1. Displays an 8-second **Important Safety Notice** warning that key fob presence inside the car is not checked (`DISCLAIMER_WAIT_SEC = 8`) before revealing settings.
+  2. Displays live **Dynamic Logic Workflow** panels at top (or a red **Switched OFF** notice when Master Auto-Lock is disabled) reflecting delay, hatchback setting, `Require Phone` setting, and live phone state (`wifi_state` + `bt_connected`).
+  3. Persists `/data/nemesis/autolock/{enabled,delay,ignore_hatch,require_phone}` atomically. Default on fresh install: `enabled=0`, `delay=10`, `ignore_hatch=1`, `require_phone=1`.
 
-### B. Root Daemon (`autolock-daemon` -> `svc/daemon.sh`)
+### C. Root Daemon (`autolock-daemon` -> `svc/daemon.sh`)
 - **Source:** `packages/gen5w.autolock/svc/daemon.sh`
 - **Role:**
   - Runs continuously as `uid=root` (`mode=restart` in `NEMESIS.data`).
-  - Polls Ignition status every 1 second via `service call com.hkmc.micom.bcm 17` (`getIGNStatus`).
-  - Tracks the state machine across `IGN ON -> IGN OFF` transitions:
-    1. Waits for `IGN` to transition from `1` (`ON`) to `0` (`OFF`).
-    2. Waits for at least one cabin door (`drvOpen`, `pasOpen`, `rlOpen`, `rrOpen`) to open (`any_open=1` in `/data/nemesis/autolock/door_state`).
-    3. Waits for **all 4 cabin doors** to close (`all_closed=1`). Whenever any cabin door re-opens (e.g., passengers getting out or grabbing items from the back seat), the countdown timer resets so the delay is always measured from when the **last cabin door closes**.
-    4. **Hatch / 5th Door Exclusion:** `trunkOpen` (the 9th integer in `onDoorAllStateChanged`) and `hoodState` (the 10th integer) are intentionally excluded from `anyCabinOpen` / `allCabinClosed` so the car still locks normally even if the power tailgate/hatch is open or closing slowly.
-    5. Counts down the configured delay (`5`, `10`, `15`, or `20` seconds).
-    6. **Optional Bluetooth Gate (`bt_req=1`):** If enabled, waits after the countdown finishes until `/data/nemesis/autolock/bt_connected` reads `0` (both HFP and A2DP disconnected). *Note:* Keep in mind that if the car is parked ~30 ft from the house, phone Bluetooth may stay connected inside the house unless out of range or head unit sleep cuts BT.
-    7. **Final Safety Check & Lock Execution:** Re-reads `/data/nemesis/autolock/door_state` right before locking to verify `all_closed_now == 1`. If all 4 cabin doors are closed, executes:
-       ```sh
-       service call com.hkmc.micom.bcm 5 i32 1
-       ```
-       (`IBCMService.lockDoor(true)`).
+  - Polls Ignition status via `service call com.hkmc.micom.bcm 17` (`getIGNStatus`, preserving previous state if an IPC call fails) and Wi-Fi Direct / P2P ARP peer reachability (`p2p*` preferred, `wlan*` fallback, `ping -c 1 -W 1`) written to `/data/nemesis/autolock/wifi_state`.
+  - Tracks `session_phone` (`wifi` -> `bt` fallback -> `none`) with a 5s hysteresis while `IGN ON` so transient Wi-Fi glitches don't drop tracking while mid-drive disconnects still update cleanly before `IGN OFF`.
+  - State machine on `IGN ON -> IGN OFF` (when `enabled=1`):
+    1. Waits for at least one monitored door to open (`eff_any=1`) and then all monitored doors to close (`eff_closed=1`; rear hatch included only when `ignore_hatch=0`).
+    2. Counts down `delay` seconds (`5`–`20s`) from when the last monitored door closed.
+    3. Checks phone requirement/proximity:
+       - If `session_phone="none"` and `require_phone=1`, skips locking (`SKIP_LOCK: No phone detected`) and sets `locked_this_cycle=1` without falling back to timer-only locking.
+       - If `session_phone="wifi"`, holds until `wifi_fail_streak >= 2`.
+       - If `session_phone="bt"`, holds until `bt_conn=0`.
+    4. Final safety check: re-reads `door_state` (aborting if empty/open) and `lock_state` (skipping redundant lock command if `all_locked_now=1`). Otherwise executes `service call com.hkmc.micom.bcm 5 i32 1` (`IBCMService.lockDoor(true)`).
+  - Writes bounded logs to `/data/nemesis/autolock/autolock.log` and mirrors logs to USB (`<usb>/autolock.log`) **only** if `<usb>/autolock.log` already exists on the mounted USB drive.
 
 ---
 
