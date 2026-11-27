@@ -208,7 +208,7 @@ while true; do
     svc_check_tick=$((svc_check_tick + 1))
     if [ "$svc_check_tick" -ge 15 ]; then
         svc_check_tick=0
-        if ! ps 2>/dev/null | grep -q "com\.gen5w\.autolock"; then
+        if ! ps 2>/dev/null | grep "com\.gen5w\.autolock" >/dev/null; then
             am startservice -n com.gen5w.autolock/.AutoLockBridgeService >/dev/null 2>&1 || true
         fi
     fi
